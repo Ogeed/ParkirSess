@@ -1,0 +1,14 @@
+[phases.install]
+cmds = [
+  "composer install --no-dev --optimize-autoloader",
+]
+
+[phases.build]
+cmds = [
+  "php artisan event:cache",
+  "php artisan route:cache",
+  "php artisan view:cache",
+]
+
+[phases.deploy]
+startCmd = "php artisan serve --host=0.0.0.0 --port=$PORT"

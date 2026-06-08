@@ -1,0 +1,57 @@
+Table users {
+  id BIGINT [pk, increment]
+  name VARCHAR(255) [not null]
+  email VARCHAR(255) [not null, unique]
+  email_verified_at TIMESTAMP
+  password VARCHAR(255) [not null]
+  remember_token VARCHAR(100)
+  role VARCHAR(20) [default: 'admin']
+  created_at TIMESTAMP
+  updated_at TIMESTAMP
+}
+
+Table devices {
+  id VARCHAR(50) [pk]
+  name VARCHAR(100) [not null]
+  firmware_version VARCHAR(20)
+  ip_address VARCHAR(45)
+  wifi_rssi INTEGER
+  api_token VARCHAR(255) [not null, unique]
+  is_online BOOLEAN [default: false]
+  last_seen TIMESTAMPTZ
+  battery_level INTEGER
+  uptime_seconds INTEGER
+  deleted_at TIMESTAMPTZ
+  created_at TIMESTAMPTZ
+  updated_at TIMESTAMPTZ
+}
+
+Table sensor_readings {
+  id UUID [pk]
+  device_id VARCHAR(50) [not null]
+  sensor_left NUMERIC(6,2) [not null]
+  sensor_right NUMERIC(6,2) [not null]
+  sensor_back NUMERIC(6,2) [not null]
+  status_left VARCHAR(10) [not null]
+  status_right VARCHAR(10) [not null]
+  status_back VARCHAR(10) [not null]
+  overall_status VARCHAR(10) [not null]
+  wifi_rssi INTEGER
+  created_at TIMESTAMPTZ
+}
+
+Table sensor_alerts {
+  id UUID [pk]
+  device_id VARCHAR(50) [not null]
+  reading_id UUID
+  alert_type VARCHAR(20) [not null]
+  sensor_position VARCHAR(10)
+  distance_value NUMERIC(6,2)
+  is_acknowledged BOOLEAN [default: false]
+  acknowledged_at TIMESTAMPTZ
+  created_at TIMESTAMPTZ
+}
+
+Ref: devices.id < sensor_readings.device_id
+Ref: devices.id < sensor_alerts.device_id
+Ref: sensor_readings.id < sensor_alerts.reading_id
