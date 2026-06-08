@@ -5,7 +5,10 @@
     </div>
 
     @push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
     <script>
+        Chart.register(ChartAnnotation);
+
         document.addEventListener('livewire:init', () => {
             const ctx = document.getElementById('sensorChart');
             if (!ctx) return;
