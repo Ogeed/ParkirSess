@@ -4,13 +4,6 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\SensorDataController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
-use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Support\Facades\RateLimiter;
-
-RateLimiter::for('sensor', function (Request $request) {
-    return Limit::perMinute(60)->by($request->input('device_id') ?? $request->ip());
-});
 
 Route::prefix('v1')->group(function () {
 
