@@ -9,9 +9,9 @@
                 $backDist = $latestReading?->sensor_back ?? 50;
                 $maxDist = 100;
 
-                $leftPct = min($leftDist / $maxDist, 1);
-                $rightPct = min($rightDist / $maxDist, 1);
-                $backPct = min($backDist / $maxDist, 1);
+                $leftPct = max(0, min($leftDist / $maxDist, 1));
+                $rightPct = max(0, min($rightDist / $maxDist, 1));
+                $backPct = max(0, min($backDist / $maxDist, 1));
 
                 $leftColor = $leftDist > 50 ? '#22C55E' : ($leftDist >= 20 ? '#EAB308' : '#EF4444');
                 $rightColor = $rightDist > 50 ? '#22C55E' : ($rightDist >= 20 ? '#EAB308' : '#EF4444');
@@ -38,7 +38,7 @@
             <text x="80" y="45" font-family="JetBrains Mono" font-size="10" fill="#94A3B8">◄ KIRI</text>
 
             <rect x="220" y="55" width="100" height="20" rx="4" fill="{{ $rightColor }}" opacity="0.3"/>
-            <rect x="320" y="55" width="{{ -100 * $rightPct }}" height="20" rx="4" fill="{{ $rightColor }}" opacity="0.8" transform="translate(-100,0)">
+            <rect x="{{ 320 - (100 * $rightPct) }}" y="55" width="{{ 100 * $rightPct }}" height="20" rx="4" fill="{{ $rightColor }}" opacity="0.8">
                 <animate attributeName="opacity" values="0.8;0.5;0.8" dur="2s" repeatCount="indefinite"/>
             </rect>
             <text x="280" y="48" text-anchor="middle" font-family="JetBrains Mono" font-size="11" fill="{{ $rightColor }}" font-weight="bold">{{ number_format($rightDist, 1) }}cm</text>

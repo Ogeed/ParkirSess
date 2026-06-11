@@ -1,4 +1,4 @@
-<div wire:poll.1000ms="refresh" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+<div wire:poll.1000ms="refresh" class="grid grid-cols-2 gap-4 xl:grid-cols-4">
     @php
         $positions = [
             ['label' => 'KIRI', 'value' => $latestReading?->sensor_left, 'status' => $latestReading?->status_left, 'icon' => 'M12 9v3m0 0v3m0-3h3m-3 0H9'],

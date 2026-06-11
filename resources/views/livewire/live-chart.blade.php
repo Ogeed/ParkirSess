@@ -5,10 +5,7 @@
     </div>
 
     @push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
     <script>
-        Chart.register(ChartAnnotation);
-
         document.addEventListener('livewire:init', () => {
             const ctx = document.getElementById('sensorChart');
             if (!ctx) return;
@@ -82,40 +79,7 @@
                                 usePointStyle: true,
                             },
                         },
-                        annotation: {
-                            annotations: {
-                                warningLine: {
-                                    type: 'line',
-                                    yMin: 50,
-                                    yMax: 50,
-                                    borderColor: '#EAB308',
-                                    borderWidth: 1,
-                                    borderDash: [5, 5],
-                                    label: {
-                                        content: 'WARNING (50cm)',
-                                        display: true,
-                                        position: 'start',
-                                        color: '#EAB308',
-                                        font: { family: 'JetBrains Mono', size: 10 },
-                                    },
-                                },
-                                dangerLine: {
-                                    type: 'line',
-                                    yMin: 20,
-                                    yMax: 20,
-                                    borderColor: '#EF4444',
-                                    borderWidth: 1,
-                                    borderDash: [5, 5],
-                                    label: {
-                                        content: 'DANGER (20cm)',
-                                        display: true,
-                                        position: 'start',
-                                        color: '#EF4444',
-                                        font: { family: 'JetBrains Mono', size: 10 },
-                                    },
-                                },
-                            },
-                        },
+
                     },
                     scales: {
                         x: {
@@ -138,12 +102,12 @@
                 },
             });
 
-            Livewire.on('chartUpdated', (data) => {
+            Livewire.on('chartUpdated', ({ chartData }) => {
                 if (window.sensorChart) {
-                    window.sensorChart.data.labels = data.labels;
-                    window.sensorChart.data.datasets[0].data = data.left;
-                    window.sensorChart.data.datasets[1].data = data.right;
-                    window.sensorChart.data.datasets[2].data = data.back;
+                    window.sensorChart.data.labels = chartData.labels;
+                    window.sensorChart.data.datasets[0].data = chartData.left;
+                    window.sensorChart.data.datasets[1].data = chartData.right;
+                    window.sensorChart.data.datasets[2].data = chartData.back;
                     window.sensorChart.update('none');
                 }
             });

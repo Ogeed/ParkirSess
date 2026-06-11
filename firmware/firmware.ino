@@ -14,10 +14,12 @@
  */
 
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <WiFiClientSecure.h>
 
 // ============== KONFIGURASI ==============
 const char* WIFI_SSID     = "ZERO26";
@@ -26,7 +28,7 @@ const char* WIFI_PASS     = "nomorRumahku";
 // Ganti dengan IP komputer kamu (cek pakai ipconfig)
 // Kalau pakai laragon, pake IP lokal: 192.168.x.x
 // Kalau pakai artisan serve, pake IP komputer + port 8000
-const char* API_BASE_URL  = "http://192.168.1.11/api/v1";
+const char* API_BASE_URL  = "https://easypark.my.id/api/v1";
 const char* DEVICE_ID     = "ESP32-PARKIR-001";
 const char* DEVICE_NAME   = "Sensor Parkir Utama";
 const char* FW_VERSION    = "2.0.0";
@@ -37,7 +39,7 @@ const int THRESHOLD_WARNING = 20;
 
 // Interval (ms)
 const int LOOP_DELAY      = 50;
-const int SEND_INTERVAL   = 5000;  // kirim data tiap 5 detik (server lambat)
+const int SEND_INTERVAL   = 10000;  // kirim data tiap 10 detik (server lambat)
 // =========================================
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -52,6 +54,8 @@ const int BUZZER = 26, LED_HIJAU = 27, LED_KUNING = 14, LED_MERAH = 12;
 
 String apiToken = "";
 unsigned long lastSend = 0;
+WiFiClientSecure clientSecure;
+HTTPClient http;
 
 int jarakKiri = 0, jarakKanan = 0, jarakBelakang = 0;
 String statusKiri, statusKanan, statusBelakang, overallStatus;
@@ -78,7 +82,6 @@ void initPins() {
   pinMode(TRIG_KIRI, OUTPUT); pinMode(ECHO_KIRI, INPUT);
   pinMode(TRIG_KANAN, OUTPUT); pinMode(ECHO_KANAN, INPUT);
   pinMode(TRIG_BELAKANG, OUTPUT); pinMode(ECHO_BELAKANG, INPUT);
-  pinMode(BUZZER, OUTPUT);
   pinMode(LED_HIJAU, OUTPUT);
   pinMode(LED_KUNING, OUTPUT);
   pinMode(LED_MERAH, OUTPUT);
@@ -86,7 +89,10 @@ void initPins() {
   digitalWrite(LED_HIJAU, LOW);
   digitalWrite(LED_KUNING, LOW);
   digitalWrite(LED_MERAH, LOW);
-  digitalWrite(BUZZER, LOW);
+
+  // Setup buzzer PWM (2kHz, 8-bit)
+  ledcAttach(BUZZER, 2000, 8);
+  ledcWrite(BUZZER, 0);
 }
 
 void initLCD() {
@@ -161,14 +167,16 @@ void registerDevice() {
 
     Serial.printf("[API] Register (percobaan %d)...\n", i + 1);
 
-    HTTPClient http;
-    http.begin(String(API_BASE_URL) + "/devices/register");
-    http.addHeader("Content-Type", "application/json");
-    http.setTimeout(10000);
+    WiFiClientSecure regClient;
+    regClient.setInsecure();
+    HTTPClient httpReg;
+    httpReg.begin(regClient, String(API_BASE_URL) + "/devices/register");
+    httpReg.addHeader("Content-Type", "application/json");
+    httpReg.setTimeout(5000);
 
-    int httpCode = http.POST(body);
-    String responseBody = http.getString();
-    http.end();
+    int httpCode = httpReg.POST(body);
+    String responseBody = httpReg.getString();
+    httpReg.end();
 
     if (httpCode == 200) {
       StaticJsonDocument<512> res;
@@ -180,8 +188,8 @@ void registerDevice() {
         updateLCD("Register OK", "Token saved");
       }
     } else {
-      Serial.printf("[API] Gagal HTTP %d, tunggu 5 detik...\n", httpCode);
-      delay(5000);
+      Serial.printf("[API] Register HTTP %d\n", httpCode);
+      delay(2000);
     }
   }
 
@@ -201,10 +209,16 @@ int bacaJarak(int trig, int echo) {
   delayMicroseconds(10);
   digitalWrite(trig, LOW);
 
-  long duration = pulseIn(echo, HIGH, 30000);
-  if (duration == 0) return 400;
+  unsigned long timeout = micros() + 30000UL;
+  while (digitalRead(echo) == LOW && micros() < timeout);
+  if (micros() >= timeout) return 400;
 
-  return duration * 0.034 / 2;
+  unsigned long start = micros();
+  timeout = micros() + 30000UL;
+  while (digitalRead(echo) == HIGH && micros() < timeout);
+  if (micros() >= timeout) return 400;
+
+  return (micros() - start) * 0.034 / 2;
 }
 
 String calcStatus(int jarak) {
@@ -221,20 +235,27 @@ String calcOverall(String s1, String s2, String s3) {
 
 // ======================= LED & BUZZER =======================
 void updateAktuator() {
-  // Matikan semua LED dulu
   digitalWrite(LED_MERAH, LOW);
   digitalWrite(LED_KUNING, LOW);
   digitalWrite(LED_HIJAU, LOW);
 
   if (overallStatus == "DANGER") {
     digitalWrite(LED_MERAH, HIGH);
-    digitalWrite(BUZZER, (millis() % 200 < 100) ? HIGH : LOW);
+    if (millis() % 200 < 100) {
+      ledcWriteTone(BUZZER, 2500);
+    } else {
+      ledcWrite(BUZZER, 0);
+    }
   } else if (overallStatus == "WARNING") {
     digitalWrite(LED_KUNING, HIGH);
-    digitalWrite(BUZZER, (millis() % 600 < 100) ? HIGH : LOW);
+    if (millis() % 600 < 200) {
+      ledcWriteTone(BUZZER, 1800);
+    } else {
+      ledcWrite(BUZZER, 0);
+    }
   } else {
     digitalWrite(LED_HIJAU, HIGH);
-    digitalWrite(BUZZER, LOW);
+    ledcWrite(BUZZER, 0);
   }
 }
 
@@ -272,28 +293,44 @@ void sendSensorData() {
   String body;
   serializeJson(doc, body);
 
-  WiFiClient client;
-  HTTPClient http;
-  http.begin(client, String(API_BASE_URL) + "/sensor-data");
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("Authorization", "Bearer " + apiToken);
-  http.setTimeout(2000);
-
-  int httpCode = http.POST(body);
-  if (httpCode == 201) {
-    Serial.println("[API] OK");
-  } else if (httpCode > 0) {
-    Serial.printf("[API] HTTP %d\n", httpCode);
+  unsigned long t = millis();
+  if (!clientSecure.connected()) {
+    clientSecure.setInsecure();
+    clientSecure.setTimeout(1500);
+    if (!clientSecure.connect("easypark.my.id", 443)) {
+      Serial.printf("[API] SSL fail (%lums)\n", millis() - t);
+      return;
+    }
   }
 
-  http.end();
+  clientSecure.printf("POST /api/v1/sensor-data HTTP/1.1\r\n"
+    "Host: easypark.my.id\r\n"
+    "Content-Type: application/json\r\n"
+    "Authorization: Bearer %s\r\n"
+    "Content-Length: %d\r\n"
+    "Connection: keep-alive\r\n"
+    "\r\n"
+    "%s",
+    apiToken.c_str(), body.length(), body.c_str()
+  );
+
+  while (clientSecure.available() == 0) {
+    if (millis() - t > 3000) break;
+    delay(1);
+  }
+  while (clientSecure.available()) {
+    clientSecure.read();
+  }
+  Serial.printf("[API] OK (%lums)\n", millis() - t);
 }
 
 // ======================= MAIN LOOP =======================
 void loop() {
-  // Baca sensor
-  jarakKiri = bacaJarak(TRIG_KIRI, ECHO_KIRI);
+  // Baca sensor (belakang duluan, jeda anti-crosstalk)
   jarakBelakang = bacaJarak(TRIG_BELAKANG, ECHO_BELAKANG);
+  delay(20);
+  jarakKiri = bacaJarak(TRIG_KIRI, ECHO_KIRI);
+  delay(20);
   jarakKanan = bacaJarak(TRIG_KANAN, ECHO_KANAN);
 
   // Hitung status

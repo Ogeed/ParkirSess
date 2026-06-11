@@ -22,18 +22,3 @@
 </div>
 @endsection
 
-@push('scripts')
-<script>
-    document.addEventListener('livewire:init', () => {
-        Livewire.on('chartUpdated', (data) => {
-            if (window.sensorChart) {
-                window.sensorChart.data.labels = data.labels;
-                window.sensorChart.data.datasets[0].data = data.left;
-                window.sensorChart.data.datasets[1].data = data.right;
-                window.sensorChart.data.datasets[2].data = data.back;
-                window.sensorChart.update('none');
-            }
-        });
-    });
-</script>
-@endpush

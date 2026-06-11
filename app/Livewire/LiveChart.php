@@ -26,6 +26,8 @@ class LiveChart extends Component
             'right' => $readings->pluck('sensor_right')->toArray(),
             'back' => $readings->pluck('sensor_back')->toArray(),
         ];
+
+        $this->dispatch('chartUpdated', chartData: $this->chartData);
     }
 
     public function render()
